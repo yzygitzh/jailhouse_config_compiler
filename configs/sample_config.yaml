@@ -1,0 +1,50 @@
+jailhouse_cell_desc:
+  signature: JHCELL
+  revision: 3
+  name: apic-demo
+  id: 0
+  flags: 0
+  cpu_set_size: 8
+  num_memory_regions: 2
+  num_cache_regions: 1
+  num_irqchips: 0
+  pio_bitmap_size: 0x2000
+  num_pci_devices: 0
+  num_pci_caps: 0
+  vpci_irq_base: 0
+
+cpus:
+  - 0x8
+
+mem_regions:
+  -
+    phys_start: 0x3f000000
+    virt_start: 0
+    size: 0x00100000
+    flags: 0x47
+  -
+    phys_start: 0
+    virt_start: 0x00100000
+    size: 0x00001000
+    flags: 0x23
+
+cache_regions:
+  -
+    start: 0
+    size: 2
+    type: 0x3
+    padding: 0
+    flags: 0
+
+pio_bitmap:
+  size: 0x2000
+  default_value: 0xff
+  holes:
+    -
+      begin: 127
+      end: 127
+      value: 0
+    -
+      begin: 7170
+      end: 7170
+      value: 0
