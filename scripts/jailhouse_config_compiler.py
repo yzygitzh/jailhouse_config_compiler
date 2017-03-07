@@ -6,16 +6,16 @@
 import os
 import struct
 import argparse
-import ruamel.yaml
+import yaml
 
 
 def gen_cell_bytes(config_yaml):
-    desc_byte_array = []
     full_bytes = ""
 
     # jailhouse_cell_desc
     jailhouse_cell_desc = config_yaml["jailhouse_cell_desc"]
-    full_bytes += struct.pack("=6sH32sIIIIIIIIII", *jailhouse_cell_desc.values())
+    full_bytes += struct.pack("=6sH32sIIIIIIIIII",
+                              *[next(iter(x.items()))[1] for x in jailhouse_cell_desc])
 
     # cpus
     cpus = config_yaml["cpus"]
@@ -24,12 +24,12 @@ def gen_cell_bytes(config_yaml):
     # mem_regions
     mem_regions = config_yaml["mem_regions"]
     for mem_region in mem_regions:
-        full_bytes += struct.pack("QQQQ", *mem_region.values())
+        full_bytes += struct.pack("QQQQ", *[next(iter(x.items()))[1] for x in mem_region])
 
     # cache_regions
     cache_regions = config_yaml["cache_regions"]
     for cache_region in cache_regions:
-        full_bytes += struct.pack("IIBBH", *cache_region.values())
+        full_bytes += struct.pack("IIBBH", *[next(iter(x.items()))[1] for x in cache_region])
 
     # pio_bitmap
     pio_bitmap = config_yaml["pio_bitmap"]
@@ -47,10 +47,10 @@ def run(config_yaml_path):
     parse config file and assemble config file
     """
     with open(os.path.abspath(config_yaml_path), "r") as config_file:
-        config_yaml = ruamel.yaml.load(config_file, ruamel.yaml.RoundTripLoader)
-
+        config_yaml = yaml.load(config_file)
+        print config_yaml
         cell_bytes = gen_cell_bytes(config_yaml)
-        with open("/tmp/testzone/testcell", "wb") as output_file:
+        with open("/tmp/testcell", "wb") as output_file:
             output_file.write(cell_bytes)
 
 
