@@ -1,0 +1,8 @@
+{
+    "c_headers": [
+        "/mnt/EXT_volume/projects/jailhouse/hypervisor/arch/x86/include/asm/types.h",
+        "/mnt/EXT_volume/projects/jailhouse/hypervisor/include/jailhouse/cell-config.h"
+    ],
+    "output_path": "/tmp/testcell",
+    "tmp_file_dir": "/tmp/tmpfile"
+}
