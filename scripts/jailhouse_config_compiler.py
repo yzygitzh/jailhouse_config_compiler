@@ -13,14 +13,16 @@ import yaml
 import pycparser
 
 
-def include_c_headers(compiler_config_json):
+def include_c_headers(compiler_config_json, eliminate_gcc_attr=False):
     c_headers = compiler_config_json["c_headers"]
     c_str_list = []
 
     # read headers and get rid of "__attribute__((packed))"'s
     for c_header_path in c_headers:
         with open(c_header_path, "r") as c_header_file:
-            c_header_str = c_header_file.read().replace("__attribute__((packed))", "")
+            c_header_str = c_header_file.read()
+            if eliminate_gcc_attr:
+                c_header_str = c_header_str.replace("__attribute__((packed))", "")
             c_str_list.append(c_header_str)
 
     return os.linesep.join(c_str_list)
@@ -28,21 +30,17 @@ def include_c_headers(compiler_config_json):
 
 def get_struct_asts(compiler_config_json):
     struct_dict = {}
-    tmp_file_path = "%s/header.c" % compiler_config_json["tmp_file_dir"]
+    tmp_file_path = "%s/tmp.c" % compiler_config_json["tmp_file_dir"]
 
     with open(tmp_file_path, "w") as tmp_file:
-        tmp_file.write(include_c_headers(compiler_config_json))
+        tmp_file.write(include_c_headers(compiler_config_json, eliminate_gcc_attr=True))
     full_ast = pycparser.parse_file(tmp_file_path, use_cpp=True)
 
     class StructVisitor(pycparser.c_ast.NodeVisitor):
         def visit_Struct(self, node):
             if node.name not in struct_dict:
                 struct_dict[node.name] = node
-
     StructVisitor().visit(full_ast)
-    for struct_name in struct_dict:
-        print struct_name
-        # struct_dict[struct_name].show()
 
     field_list = []
     field_path = []
@@ -53,10 +51,10 @@ def get_struct_asts(compiler_config_json):
         for child in node.children():
             decl_children_num += visit_decl(child[1])
         if type(node) == pycparser.c_ast.Decl and node.name:
+            field_name = ".".join(field_path)
+            type_name = "non_atomic_type"
             if decl_children_num == 0:
-                field_name = ".".join(field_path)
                 type_probe = node
-                type_name = ""
                 while type(type_probe) not in \
                       [pycparser.c_ast.IdentifierType, pycparser.c_ast.Struct]:
                     if len(type_probe.children()) > 0:
@@ -69,7 +67,31 @@ def get_struct_asts(compiler_config_json):
                         type_name = " ".join(type_probe.names)
                     else:
                         type_name = type_probe.name
-                field_list.append(" ".join([field_name, type_name]))
+
+            def sizeof_field(field_name):
+                field_path = field_name.split(".")
+                struct_type = field_path[0]
+                rest_field = ".".join(field_path[1:])
+                sizeof_statement = "%s%s" % ("struct %s probe;" % struct_type,
+                    'void f(){\
+                     asm("field_size %%0"::"i"(sizeof(probe.%s)));}' % rest_field)
+                sizeof_source = "%s%s%s" % (include_c_headers(compiler_config_json),
+                    os.linesep, sizeof_statement)
+                with open(tmp_file_path, "w") as tmp_file:
+                    tmp_file.write(sizeof_source);
+                p = subprocess.Popen(["gcc", "-S", "-xc", "-o-", "-"],
+                    stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+                asm_str = p.communicate(input=sizeof_source)[0]
+                field_size = [int(x.split(" ")[1][1:])
+                              for x in asm_str.split(os.linesep) \
+                              if "field_size" in x]
+                return field_size[0]
+
+            field_list.append({
+                "field_name" :field_name,
+                "type_info": type_name,
+                "sizeof": sizeof_field(field_name)
+            })
             field_path.pop()
             return decl_children_num + 1
         return decl_children_num
@@ -78,7 +100,7 @@ def get_struct_asts(compiler_config_json):
         field_path = [struct_name]
         visit_decl(struct_dict[struct_name])
     for field in field_list:
-        print field
+        print "%s %s %s" % (field["field_name"], field["type_info"], field["sizeof"])
 
 
 def get_macro_map():
