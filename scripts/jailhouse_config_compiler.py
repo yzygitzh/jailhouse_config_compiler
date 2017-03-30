@@ -46,24 +46,24 @@ def get_struct_asts(compiler_config_json):
     field_path = []
     def visit_decl(node):
         decl_children_num = 0
-        if type(node) == pycparser.c_ast.Decl and node.name:
+        if isinstance(node, pycparser.c_ast.Decl) and node.name:
             field_path.append(node.name)
         for child in node.children():
             decl_children_num += visit_decl(child[1])
-        if type(node) == pycparser.c_ast.Decl and node.name:
             field_name = ".".join(field_path)
             type_name = "non_atomic_type"
+        if isinstance(node, pycparser.c_ast.Decl) and node.name:
             if decl_children_num == 0:
                 type_probe = node
-                while type(type_probe) not in \
-                      [pycparser.c_ast.IdentifierType, pycparser.c_ast.Struct]:
+                while isinstance(type_probe,
+                                 (pycparser.c_ast.IdentifierType, pycparser.c_ast.Struct)):
                     if len(type_probe.children()) > 0:
                         type_probe = type_probe.children()[0][1]
                     else:
                         type_name = "unknown_type"
                         break
                 if type_name != "unknown_type":
-                    if type(type_probe) == pycparser.c_ast.IdentifierType:
+                    if isinstance(type_probe, pycparser.c_ast.IdentifierType):
                         type_name = " ".join(type_probe.names)
                     else:
                         type_name = type_probe.name
@@ -73,10 +73,11 @@ def get_struct_asts(compiler_config_json):
                 struct_type = field_path[0]
                 rest_field = ".".join(field_path[1:])
                 sizeof_statement = "%s%s" % ("struct %s probe;" % struct_type,
-                    'void f(){\
-                     asm("field_size %%0"::"i"(sizeof(probe.%s)));}' % rest_field)
+                                             'void f(){\
+                                             asm("field_size %%0"::"i"(sizeof(probe.%s)));}'
+                                             % rest_field)
                 sizeof_source = "%s%s%s" % (include_c_headers(compiler_config_json),
-                    os.linesep, sizeof_statement)
+                                            os.linesep, sizeof_statement)
                 with open(tmp_file_path, "w") as tmp_file:
                     tmp_file.write(sizeof_source);
                 p = subprocess.Popen(["gcc", "-S", "-xc", "-o-", "-"],
