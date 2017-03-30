@@ -31,6 +31,7 @@ class JCC_CUtils():
 
     def __get_struct_field_info(self, compiler_config_json):
         struct_dict = {}
+        union_dict = {}
         tmp_file_path = "%s/tmp.c" % compiler_config_json["tmp_file_dir"]
 
         with open(tmp_file_path, "w") as tmp_file:
@@ -39,25 +40,32 @@ class JCC_CUtils():
 
         class StructVisitor(pycparser.c_ast.NodeVisitor):
             def visit_Struct(self, node):
-                if node.name not in struct_dict:
+                if node.name not in struct_dict and node.name:
                     struct_dict[node.name] = node
+            def visit_Union(self, node):
+                if node.name not in union_dict and node.name:
+                    union_dict[node.name] = node
         StructVisitor().visit(full_ast)
 
         field_info_list = []
         field_path = []
 
         def size_infer():
-            struct_type_set = set([x["field_name"].split(".")[0] for x in field_info_list])
+            struct_type_set = struct_dict.keys()
             struct_decls = os.linesep.join(["struct %s %s_probe;" % (x, x)
                                             for x in struct_type_set])
+            union_type_set = union_dict.keys()
+            union_decls = os.linesep.join(["union %s %s_probe;" % (x, x)
+                                           for x in union_type_set])
             sizeof_asms = os.linesep.join(['asm("field_size %s %%0"::"i"(sizeof(%s_probe.%s)));' %
                                            (x["field_name"], x["field_name"].split(".")[0],
                                             ".".join((x["field_name"].split(".")[1:])))
                                            for x in field_info_list])
-            sizeof_source = "%s%s void f(){ %s }" % (self.__include_c_headers(compiler_config_json),
-                                                     struct_decls, sizeof_asms)
-            # with open(tmp_file_path, "w") as tmp_file:
-            #     tmp_file.write(sizeof_source)
+            sizeof_source = "%s%s%s void f(){ %s }" % \
+                            (self.__include_c_headers(compiler_config_json),
+                             struct_decls, union_decls, sizeof_asms)
+            with open(tmp_file_path, "w") as tmp_file:
+                tmp_file.write(sizeof_source)
             p = subprocess.Popen(["gcc", "-S", "-xc", "-o-", "-"],
                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             asm_str_list = [x for x in p.communicate(input=sizeof_source)[0].split(os.linesep)
@@ -67,18 +75,26 @@ class JCC_CUtils():
                 field_info_list[idx]["sizeof"] = int(asm_str.split(" ")[2][1:])
             return field_info_list
 
-        def visit_decl(node):
+        def visit_decl(node, in_union):
             decl_children_num = 0
+            type_name = "non_atomic_type"
+
             if isinstance(node, pycparser.c_ast.Decl) and node.name:
                 field_path.append(node.name)
+
             for child in node.children():
-                decl_children_num += visit_decl(child[1])
-                type_name = "non_atomic_type"
+                if isinstance(node, pycparser.c_ast.Union):
+                    decl_children_num += visit_decl(child[1], True)
+                else:
+                    decl_children_num += visit_decl(child[1], in_union)
+
             if isinstance(node, pycparser.c_ast.Decl) and node.name:
                 if decl_children_num == 0:
                     type_probe = node
                     while not isinstance(type_probe,
-                                         (pycparser.c_ast.IdentifierType, pycparser.c_ast.Struct)):
+                                         (pycparser.c_ast.IdentifierType,
+                                          pycparser.c_ast.Struct,
+                                          pycparser.c_ast.Union)):
                         if len(type_probe.children()) > 0:
                             type_probe = type_probe.children()[0][1]
                         else:
@@ -89,14 +105,21 @@ class JCC_CUtils():
                             type_name = " ".join(type_probe.names)
                         else:
                             type_name = type_probe.name
-                field_info_list.append({"type_info": type_name, "field_name": ".".join(field_path)})
+                field_info_list.append({
+                    "type_info": type_name,
+                    "field_name": ".".join(field_path),
+                    "in_union": in_union
+                })
                 field_path.pop()
                 return decl_children_num + 1
             return decl_children_num
 
         for struct_name in struct_dict:
             field_path = [struct_name]
-            visit_decl(struct_dict[struct_name])
+            visit_decl(struct_dict[struct_name], False)
+        for union_name in union_dict:
+            field_path = [union_name]
+            visit_decl(union_dict[union_name], True)
         size_infer()
         for field in field_info_list:
             print field
@@ -142,5 +165,6 @@ class JCC_CUtils():
                 macro_map[macro_id] = int(macro_val)
 
         for macro_id in macro_map:
-            print "%s %s" % (macro_id, macro_map[macro_id])
+            # print "%s %s" % (macro_id, macro_map[macro_id])
+            pass
         return macro_map
