@@ -5,14 +5,16 @@
 
 import os
 import re
+import json
 import subprocess
 import pycparser
 
-
 class JCC_CUtils():
     def __init__(self, compiler_config_json):
-        self.__struct_field_info = self.__get_struct_field_info(compiler_config_json)
+        self.__root_name_info = self.__get_struct_field_info(compiler_config_json)
         self.__macro_map = self.__get_macro_map(compiler_config_json)
+        print json.dumps(self.__root_name_info, indent=2)
+        print self.__macro_map
 
     def __include_c_headers(self, compiler_config_json, eliminate_gcc_attr=False):
         c_headers = compiler_config_json["c_headers"]
@@ -51,12 +53,10 @@ class JCC_CUtils():
         field_path = []
 
         def size_infer():
-            struct_type_set = struct_dict.keys()
             struct_decls = os.linesep.join(["struct %s %s_probe;" % (x, x)
-                                            for x in struct_type_set])
-            union_type_set = union_dict.keys()
+                                            for x in struct_dict])
             union_decls = os.linesep.join(["union %s %s_probe;" % (x, x)
-                                           for x in union_type_set])
+                                           for x in union_dict])
             sizeof_asms = os.linesep.join(['asm("field_size %s %%0"::"i"(sizeof(%s_probe.%s)));' %
                                            (x["field_name"], x["field_name"].split(".")[0],
                                             ".".join((x["field_name"].split(".")[1:])))
@@ -121,9 +121,19 @@ class JCC_CUtils():
             field_path = [union_name]
             visit_decl(union_dict[union_name], True)
         size_infer()
+
+        ret_dict = {"struct": {}, "union": {}}
         for field in field_info_list:
-            print field
-        return field_info_list
+            root_name = field["field_name"].split(".")[0]
+            if root_name in struct_dict:
+                if root_name not in ret_dict["union"]:
+                    ret_dict["union"][root_name] = []
+                ret_dict["union"][root_name].append(field)
+            elif root_name in union_dict:
+                if root_name not in ret_dict["struct"]:
+                    ret_dict["struct"][root_name] = []
+                ret_dict["struct"][root_name].append(field)
+        return ret_dict
 
 
     def __get_macro_map(self, compiler_config_json):
@@ -163,8 +173,29 @@ class JCC_CUtils():
                 macro_map[macro_id] = string_decl_map[macro_val]
             else:
                 macro_map[macro_id] = int(macro_val)
-
-        for macro_id in macro_map:
-            # print "%s %s" % (macro_id, macro_map[macro_id])
-            pass
         return macro_map
+
+    def is_a_struct(self, struct_name):
+        return struct_name in self.__root_name_info["struct"]
+
+    def is_a_union(self, union_name):
+        return union_name in self.__root_name_info["union"]
+
+    def is_a_macro(self, macro_id):
+        return macro_id in self.__macro_map
+
+    def get_macro_val(self, macro_id):
+        return self.__macro_map[macro_id]
+
+    def get_struct_size(self, struct_name):
+        return sum([x["sizeof"] for x in self.__root_name_info["struct"][struct_name]])
+
+    def get_union_size(self, union_name):
+        return sum([x["sizeof"] for x in self.__root_name_info["union"][union_name]])
+
+    def get_field_info(self, field_name):
+        for root_type in self.__root_name_info:
+            for root_name in self.__root_name_info[root_type]:
+                for field in self.__root_name_info[root_type][root_name]:
+                    if field["field_name"] == field_name:
+                        return field

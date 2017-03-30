@@ -3,7 +3,11 @@
         "/mnt/EXT_volume/projects/jailhouse/hypervisor/arch/x86/include/asm/types.h",
         "/mnt/EXT_volume/projects/jailhouse/hypervisor/include/jailhouse/cell-config.h"
     ],
+    "macro_regex": "JAILHOUSE[A-Z0-9_]+",
+    "reserved_field_types": {
+        "memory_regions": "jailhouse_memory",
+        "cache_regions": "jailhouse_cache"
+    },
     "output_path": "/tmp/testcell",
-    "tmp_file_dir": "/tmp/tmpfile",
-    "macro_regex": "JAILHOUSE[A-Z0-9_]+"
+    "tmp_file_dir": "/tmp/tmpfile"
 }
