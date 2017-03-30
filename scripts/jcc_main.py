@@ -8,7 +8,7 @@ import json
 import argparse
 import struct
 
-from jcc_c_related_utils import get_struct_field_info, get_macro_map
+import jcc_c_related_utils
 
 def gen_cell_bytes(config_yaml):
     full_bytes = ""
@@ -50,8 +50,7 @@ def run(compiler_config_json_path, cell_config_yaml_path):
     with open(os.path.abspath(compiler_config_json_path), "r") as compiler_config_json_file:
         compiler_config_json = json.load(compiler_config_json_file)
 
-    get_struct_field_info(compiler_config_json)
-    get_macro_map(compiler_config_json)
+    jcc_cutils = jcc_c_related_utils.JCC_CUtils(compiler_config_json)
     """
     with open(os.path.abspath(cell_config_yaml_path), "r") as cell_config_yaml_file:
         cell_config_yaml = yaml.load(cell_config_yaml_file)
