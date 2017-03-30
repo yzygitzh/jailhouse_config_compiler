@@ -4,5 +4,6 @@
         "/mnt/EXT_volume/projects/jailhouse/hypervisor/include/jailhouse/cell-config.h"
     ],
     "output_path": "/tmp/testcell",
-    "tmp_file_dir": "/tmp/tmpfile"
+    "tmp_file_dir": "/tmp/tmpfile",
+    "macro_regex": "JAILHOUSE[A-Z0-9_]+"
 }
