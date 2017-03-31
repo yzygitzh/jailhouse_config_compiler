@@ -7,6 +7,7 @@
     "reserved_field_types": {
         "memory_regions": "jailhouse_memory",
         "cache_regions": "jailhouse_cache",
+        "irqchips": "jailhouse_irqchip",
         "pci_devices": "jailhouse_pci_device",
         "pci_caps": "jailhouse_pci_capability"
     },

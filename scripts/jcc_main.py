@@ -30,9 +30,11 @@ def gen_cell_bytes(jcc_cutils, config_yaml, compiler_config_json):
             return ""
 
     # cpus
-    cpus = config_yaml["cpus"]
-    pre_defined_vals["%s.%s" % (meta_type, "cpu_set_size")] = len(cpus) * 8
-    cpu_bytes = struct.pack("Q" * len(cpus), *cpus)
+    cpu_bytes = ""
+    if "cpus" in config_yaml:
+        cpus = config_yaml["cpus"]
+        pre_defined_vals["%s.%s" % (meta_type, "cpu_set_size")] = len(cpus) * 8
+        cpu_bytes = struct.pack("Q" * len(cpus), *cpus)
 
     # memory_regions
     memory_bytes = gen_region_bytes("memory_regions", "num_memory_regions")
@@ -42,13 +44,15 @@ def gen_cell_bytes(jcc_cutils, config_yaml, compiler_config_json):
     irqchip_bytes = gen_region_bytes("irqchips", "num_irqchips")
 
     # pio_bitmap
-    pio_bitmap = config_yaml["pio_bitmap"]
-    pre_defined_vals["%s.%s" % (meta_type, "pio_bitmap_size")] = pio_bitmap["size"]
-    bitmap_bytes = bytearray(struct.pack("B", pio_bitmap["default_value"]) * pio_bitmap["size"])
-    for hole in pio_bitmap["holes"]:
-        for idx in range(hole["begin"], hole["end"] + 1):
-            bitmap_bytes[idx] = struct.pack("B", hole["value"])
-    pio_bitmap_bytes = str(bitmap_bytes)
+    pio_bitmap_bytes = ""
+    if "pio_bitmap" in config_yaml:
+        pio_bitmap = config_yaml["pio_bitmap"]
+        pre_defined_vals["%s.%s" % (meta_type, "pio_bitmap_size")] = pio_bitmap["size"]
+        bitmap_bytes = bytearray(struct.pack("B", pio_bitmap["default_value"]) * pio_bitmap["size"])
+        for hole in pio_bitmap["holes"]:
+            for idx in range(hole["begin"], hole["end"] + 1):
+                bitmap_bytes[idx] = struct.pack("B", hole["value"])
+        pio_bitmap_bytes = str(bitmap_bytes)
 
     # pci_devices
     pci_device_bytes = gen_region_bytes("pci_devices", "num_pci_devices")

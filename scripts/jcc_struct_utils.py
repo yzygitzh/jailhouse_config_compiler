@@ -32,12 +32,14 @@ class JCC_StructUtils():
             if array_length == 1:
                 return [sum(ret_array)]
             else:
-                return [ret_array]
+                return ret_array + [0] * (array_length - len(ret_array))
         else:
             if self.__c_util.is_a_macro(field_val):
                 return [self.__c_util.get_macro_val(field_val)]
-            else:
+            elif isinstance(field_val, str):
                 return [field_val]
+            else:
+                return [field_val] + [0] * (array_length - 1)
 
     def pack_struct(self, struct_name, yaml_struct, pre_defined_vals):
         ret_bytes = ""
