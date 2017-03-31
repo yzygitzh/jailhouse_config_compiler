@@ -13,42 +13,44 @@ import jcc_c_utils
 import jcc_struct_utils
 
 def gen_cell_bytes(jcc_cutils, config_yaml, compiler_config_json):
+    meta_type = compiler_config_json["meta_type"]
     full_bytes = ""
     pre_defined_vals = {}
     jcc_sutils = jcc_struct_utils.JCC_StructUtils(jcc_cutils)
 
     # cpus
     cpus = config_yaml["cpus"]
-    pre_defined_vals["num_cpus"] = len(cpus) * 8
+    pre_defined_vals["%s.%s" % (meta_type, "cpu_set_size")] = len(cpus) * 8
     full_bytes += struct.pack("Q" * len(cpus), *cpus)
 
-    # mem_regions
-    mem_regions = config_yaml["memory_regions"]
-    pre_defined_vals["num_memory_regions"] = len(mem_regions)
-    for mem_region in mem_regions:
+    # memory_regions
+    memory_regions = config_yaml["memory_regions"]
+    pre_defined_vals["%s.%s" % (meta_type, "num_memory_regions")] = len(memory_regions)
+    for memory_region in memory_regions:
         full_bytes += jcc_sutils.pack_struct(compiler_config_json["reserved_field_types"]["memory_regions"],
-                                             mem_region, pre_defined_vals)
+                                             memory_region, [])
 
-    # fill back jailhouse_cell_desc
-    full_bytes = jcc_sutils.pack_struct("jailhouse_cell_desc",
-                                        config_yaml["jailhouse_cell_desc"],
-                                        pre_defined_vals) + full_bytes
-
-
-    """
     # cache_regions
     cache_regions = config_yaml["cache_regions"]
+    pre_defined_vals["%s.%s" % (meta_type, "num_cache_regions")] = len(cache_regions)
     for cache_region in cache_regions:
-        full_bytes += struct.pack("IIBBH", *[next(iter(x.items()))[1] for x in cache_region])
+        full_bytes += jcc_sutils.pack_struct(compiler_config_json["reserved_field_types"]["cache_regions"],
+                                             cache_region, [])
 
     # pio_bitmap
     pio_bitmap = config_yaml["pio_bitmap"]
+    pre_defined_vals["%s.%s" % (meta_type, "pio_bitmap_size")] = pio_bitmap["size"]
     bitmap_bytes = bytearray(struct.pack("B", pio_bitmap["default_value"]) * pio_bitmap["size"])
     for hole in pio_bitmap["holes"]:
         for idx in range(hole["begin"], hole["end"] + 1):
             bitmap_bytes[idx] = struct.pack("B", hole["value"])
     full_bytes += str(bitmap_bytes)
-    """
+
+    # fill back meta_type
+    full_bytes = jcc_sutils.pack_struct(meta_type,
+                                        config_yaml[meta_type],
+                                        pre_defined_vals) + full_bytes
+
     return full_bytes
 
 
@@ -63,9 +65,9 @@ def run(compiler_config_json_path, cell_config_yaml_path):
 
     with open(os.path.abspath(cell_config_yaml_path), "r") as cell_config_yaml_file:
         cell_config_yaml = yaml.load(cell_config_yaml_file)
-        print cell_config_yaml
+        # print cell_config_yaml
         cell_bytes = gen_cell_bytes(jcc_cutils, cell_config_yaml, compiler_config_json)
-        print len(cell_bytes)
+        # print len(cell_bytes)
         with open(compiler_config_json["output_path"], "wb") as output_file:
             output_file.write(cell_bytes)
 

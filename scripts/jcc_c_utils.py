@@ -13,8 +13,8 @@ class JCC_CUtils():
     def __init__(self, compiler_config_json):
         self.__root_name_info = self.__get_struct_field_info(compiler_config_json)
         self.__macro_map = self.__get_macro_map(compiler_config_json)
-        print json.dumps(self.__root_name_info, indent=2)
-        print self.__macro_map
+        # print json.dumps(self.__root_name_info, indent=2)
+        # print self.__macro_map
 
     def __include_c_headers(self, compiler_config_json, eliminate_gcc_attr=False):
         c_headers = compiler_config_json["c_headers"]
@@ -187,11 +187,14 @@ class JCC_CUtils():
     def get_macro_val(self, macro_id):
         return self.__macro_map[macro_id]
 
-    def get_struct_size(self, struct_name):
-        return sum([x["sizeof"] for x in self.__root_name_info["struct"][struct_name]])
+    def get_struct_info(self, struct_name):
+        if struct_name in self.__root_name_info["struct"]:
+            return self.__root_name_info["struct"][struct_name]
+        else:
+            return self.__root_name_info["union"][struct_name]
 
-    def get_union_size(self, union_name):
-        return sum([x["sizeof"] for x in self.__root_name_info["union"][union_name]])
+    def get_struct_size(self, struct_name):
+        return sum([x["sizeof"] for x in self.get_struct_info(struct_name)])
 
     def get_field_info(self, field_name):
         for root_type in self.__root_name_info:
@@ -199,3 +202,4 @@ class JCC_CUtils():
                 for field in self.__root_name_info[root_type][root_name]:
                     if field["field_name"] == field_name:
                         return field
+

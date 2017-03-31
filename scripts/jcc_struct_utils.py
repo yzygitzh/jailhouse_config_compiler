@@ -26,19 +26,30 @@ class JCC_StructUtils():
 
     def pack_struct(self, struct_name, yaml_struct, pre_defined_vals):
         ret_bytes = ""
+        struct_info = self.__c_util.get_struct_info(struct_name)
+        yaml_fields = {}
+
         for field in yaml_struct:
             field_key = next(iter(field.items()))[0]
             field_val = next(iter(field.items()))[1]
             field_path = ".".join([struct_name, field_key])
-            field_info = self.__c_util.get_field_info(field_path)
             if self.__c_util.is_a_struct(field_key) or \
                self.__c_util.is_a_union(field_key):
                 ret_bytes += self.pack_struct(field_key, field_val, pre_defined_vals)
             else:
-                # get size tag
-                size_tag = self.__infer_size_tag(field_info["type_info"], field_info["sizeof"])
-                print field_path, size_tag
                 if self.__c_util.is_a_macro(field_val):
                     field_val = self.__c_util.get_macro_val(field_val)
-                ret_bytes += struct.pack("=%s" % size_tag, field_val)
+                yaml_fields[field_key] = field_val
+
+        for field in struct_info:
+            field_key = field["field_name"].split(".")[1]
+            # get size tag
+            size_tag = self.__infer_size_tag(field["type_info"], field["sizeof"])
+            if field["field_name"] in pre_defined_vals:
+                ret_bytes += struct.pack("=%s" % size_tag, pre_defined_vals[field["field_name"]])
+            elif field_key in yaml_fields:
+                ret_bytes += struct.pack("=%s" % size_tag, yaml_fields[field_key])
+            else:
+                ret_bytes += struct.pack("=%s" % size_tag, 0)
+
         return ret_bytes

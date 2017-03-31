@@ -9,5 +9,6 @@
         "cache_regions": "jailhouse_cache"
     },
     "output_path": "/tmp/testcell",
-    "tmp_file_dir": "/tmp/tmpfile"
+    "tmp_file_dir": "/tmp/tmpfile",
+    "meta_type": "jailhouse_cell_desc"
 }
