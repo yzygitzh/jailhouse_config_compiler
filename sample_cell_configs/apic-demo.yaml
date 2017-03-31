@@ -1,6 +1,6 @@
 jailhouse_cell_desc:
   - signature: JAILHOUSE_CELL_DESC_SIGNATURE
-  - revision: 3
+  - revision: JAILHOUSE_CONFIG_REVISION
   - name: apic-demo
 
 cpus:
