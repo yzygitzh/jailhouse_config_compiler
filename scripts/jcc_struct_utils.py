@@ -24,6 +24,17 @@ class JCC_StructUtils():
         else:
             print "Not a basic type: %s/%s" % (c_type, length)
 
+    def __extract_field_val(self, field_val):
+        if isinstance(field_val, list):
+            return sum([self.__c_util.get_macro_val(x)
+                        if self.__c_util.is_a_macro(x) else x
+                        for x in field_val])
+        else:
+            if self.__c_util.is_a_macro(field_val):
+                return self.__c_util.get_macro_val(field_val)
+            else:
+                return field_val
+
     def pack_struct(self, struct_name, yaml_struct, pre_defined_vals):
         ret_bytes = ""
         struct_info = self.__c_util.get_struct_info(struct_name)
@@ -32,14 +43,11 @@ class JCC_StructUtils():
         for field in yaml_struct:
             field_key = next(iter(field.items()))[0]
             field_val = next(iter(field.items()))[1]
-            field_path = ".".join([struct_name, field_key])
             if self.__c_util.is_a_struct(field_key) or \
                self.__c_util.is_a_union(field_key):
                 ret_bytes += self.pack_struct(field_key, field_val, pre_defined_vals)
             else:
-                if self.__c_util.is_a_macro(field_val):
-                    field_val = self.__c_util.get_macro_val(field_val)
-                yaml_fields[field_key] = field_val
+                yaml_fields[field_key] = self.__extract_field_val(field_val)
 
         for field in struct_info:
             field_key = field["field_name"].split(".")[1]
