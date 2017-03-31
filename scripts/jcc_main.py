@@ -18,24 +18,29 @@ def gen_cell_bytes(jcc_cutils, config_yaml, compiler_config_json):
     pre_defined_vals = {}
     jcc_sutils = jcc_struct_utils.JCC_StructUtils(jcc_cutils)
 
+    def gen_region_bytes(region_name, pre_defined_val_name):
+        if region_name in config_yaml:
+            regions = config_yaml[region_name]
+            pre_defined_vals["%s.%s" % (meta_type, pre_defined_val_name)] = len(regions)
+            ret_bytes = ""
+            for region in regions:
+                ret_bytes += jcc_sutils.pack_struct(compiler_config_json["reserved_field_types"][region_name],
+                                                    region, [])
+            return ret_bytes
+        else:
+            return ""
+
     # cpus
     cpus = config_yaml["cpus"]
     pre_defined_vals["%s.%s" % (meta_type, "cpu_set_size")] = len(cpus) * 8
     full_bytes += struct.pack("Q" * len(cpus), *cpus)
 
     # memory_regions
-    memory_regions = config_yaml["memory_regions"]
-    pre_defined_vals["%s.%s" % (meta_type, "num_memory_regions")] = len(memory_regions)
-    for memory_region in memory_regions:
-        full_bytes += jcc_sutils.pack_struct(compiler_config_json["reserved_field_types"]["memory_regions"],
-                                             memory_region, [])
-
+    full_bytes += gen_region_bytes("memory_regions", "num_memory_regions")
     # cache_regions
-    cache_regions = config_yaml["cache_regions"]
-    pre_defined_vals["%s.%s" % (meta_type, "num_cache_regions")] = len(cache_regions)
-    for cache_region in cache_regions:
-        full_bytes += jcc_sutils.pack_struct(compiler_config_json["reserved_field_types"]["cache_regions"],
-                                             cache_region, [])
+    full_bytes += gen_region_bytes("cache_regions", "num_cache_regions")
+    # irqchips
+    full_bytes += gen_region_bytes("irqchips", "num_irqchips")
 
     # pio_bitmap
     pio_bitmap = config_yaml["pio_bitmap"]
@@ -46,11 +51,15 @@ def gen_cell_bytes(jcc_cutils, config_yaml, compiler_config_json):
             bitmap_bytes[idx] = struct.pack("B", hole["value"])
     full_bytes += str(bitmap_bytes)
 
+    # pci_devices
+    full_bytes += gen_region_bytes("pci_devices", "num_pci_devices")
+	# pci_caps
+    full_bytes += gen_region_bytes("pci_caps", "num_pci_caps")
+
     # fill back meta_type
     full_bytes = jcc_sutils.pack_struct(meta_type,
                                         config_yaml[meta_type],
                                         pre_defined_vals) + full_bytes
-
     return full_bytes
 
 
