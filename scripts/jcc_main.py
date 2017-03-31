@@ -14,7 +14,6 @@ import jcc_struct_utils
 
 def gen_cell_bytes(jcc_cutils, config_yaml, compiler_config_json):
     meta_type = compiler_config_json["meta_type"]
-    full_bytes = ""
     pre_defined_vals = {}
     jcc_sutils = jcc_struct_utils.JCC_StructUtils(jcc_cutils)
 
@@ -33,14 +32,14 @@ def gen_cell_bytes(jcc_cutils, config_yaml, compiler_config_json):
     # cpus
     cpus = config_yaml["cpus"]
     pre_defined_vals["%s.%s" % (meta_type, "cpu_set_size")] = len(cpus) * 8
-    full_bytes += struct.pack("Q" * len(cpus), *cpus)
+    cpu_bytes = struct.pack("Q" * len(cpus), *cpus)
 
     # memory_regions
-    full_bytes += gen_region_bytes("memory_regions", "num_memory_regions")
+    memory_bytes = gen_region_bytes("memory_regions", "num_memory_regions")
     # cache_regions
-    full_bytes += gen_region_bytes("cache_regions", "num_cache_regions")
+    cache_bytes = gen_region_bytes("cache_regions", "num_cache_regions")
     # irqchips
-    full_bytes += gen_region_bytes("irqchips", "num_irqchips")
+    irqchip_bytes = gen_region_bytes("irqchips", "num_irqchips")
 
     # pio_bitmap
     pio_bitmap = config_yaml["pio_bitmap"]
@@ -49,18 +48,19 @@ def gen_cell_bytes(jcc_cutils, config_yaml, compiler_config_json):
     for hole in pio_bitmap["holes"]:
         for idx in range(hole["begin"], hole["end"] + 1):
             bitmap_bytes[idx] = struct.pack("B", hole["value"])
-    full_bytes += str(bitmap_bytes)
+    pio_bitmap_bytes = str(bitmap_bytes)
 
     # pci_devices
-    full_bytes += gen_region_bytes("pci_devices", "num_pci_devices")
+    pci_device_bytes = gen_region_bytes("pci_devices", "num_pci_devices")
 	# pci_caps
-    full_bytes += gen_region_bytes("pci_caps", "num_pci_caps")
+    pci_caps_bytes = gen_region_bytes("pci_caps", "num_pci_caps")
 
     # fill back meta_type
-    full_bytes = jcc_sutils.pack_struct(meta_type,
+    meta_bytes = jcc_sutils.pack_struct(meta_type,
                                         config_yaml[meta_type],
-                                        pre_defined_vals) + full_bytes
-    return full_bytes
+                                        pre_defined_vals)
+    return meta_bytes + cpu_bytes + memory_bytes + cache_bytes + irqchip_bytes + \
+           pio_bitmap_bytes + pci_device_bytes + pci_caps_bytes
 
 
 def run(compiler_config_json_path, cell_config_yaml_path):

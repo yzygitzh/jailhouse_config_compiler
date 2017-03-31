@@ -6,7 +6,9 @@
     "macro_regex": "JAILHOUSE[A-Z0-9_]+",
     "reserved_field_types": {
         "memory_regions": "jailhouse_memory",
-        "cache_regions": "jailhouse_cache"
+        "cache_regions": "jailhouse_cache",
+        "pci_devices": "jailhouse_pci_device",
+        "pci_caps": "jailhouse_pci_capability"
     },
     "output_path": "/tmp/testcell",
     "tmp_file_dir": "/tmp/tmpfile",
