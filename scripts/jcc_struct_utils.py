@@ -24,36 +24,29 @@ class JCC_StructUtils():
         else:
             print "Not a basic type: %s/%s" % (c_type, length)
 
-    def __extract_field_val(self, field_val, array_length):
+    def __extract_field_val(self, field_val, array_length): # accept basic type list
         if isinstance(field_val, list):
+            # macro substitution
             ret_array = [self.__c_util.get_macro_val(x)
                          if self.__c_util.is_a_macro(x) else x
                          for x in field_val]
-            if array_length == 1:
+            if array_length == 1: # OR operation
                 return [sum(ret_array)]
-            else:
+            else: # array initialization
                 return ret_array + [0] * (array_length - len(ret_array))
         else:
+            # macro substitution
             if self.__c_util.is_a_macro(field_val):
                 return [self.__c_util.get_macro_val(field_val)]
             elif isinstance(field_val, str):
                 return [field_val]
-            else:
+            else: # array initialization (without [] in YAML)
                 return [field_val] + [0] * (array_length - 1)
 
     def pack_struct(self, struct_name, yaml_struct, pre_defined_vals):
         ret_bytes = ""
         struct_info = self.__c_util.get_struct_info(struct_name)
-        yaml_fields = {}
         struct_field_bytes = {}
-
-        for field_key in yaml_struct:
-            field_val = yaml_struct[field_key]
-            if self.__c_util.is_a_struct(field_key) or \
-               self.__c_util.is_a_union(field_key):
-                struct_field_bytes["field_key"] = self.pack_struct(field_key, field_val, pre_defined_vals)
-            else:
-                yaml_fields[field_key] = field_val # self.__extract_field_val(field_val)
 
         for field in struct_info:
             field_key = field["field_name"].split(".")[1]
@@ -61,9 +54,9 @@ class JCC_StructUtils():
             size_tag, array_length = self.__infer_size_tag(field["type_info"], field["sizeof"])
             if field["field_name"] in pre_defined_vals:
                 ret_bytes += struct.pack("=%s" % size_tag, pre_defined_vals[field["field_name"]])
-            elif field_key in yaml_fields:
+            elif field_key in yaml_struct:
                 ret_bytes += struct.pack("=%s" % size_tag,
-                                         *self.__extract_field_val(yaml_fields[field_key],
+                                         *self.__extract_field_val(yaml_struct[field_key],
                                                                    array_length))
             elif field_key in struct_field_bytes:
                 ret_bytes += struct_field_bytes[field_key]
