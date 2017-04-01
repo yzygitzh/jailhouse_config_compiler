@@ -13,7 +13,7 @@ class JCC_CUtils():
     def __init__(self, compiler_config_json):
         self.__root_name_info = self.__get_struct_field_info(compiler_config_json)
         self.__macro_map = self.__get_macro_map(compiler_config_json)
-        print json.dumps(self.__root_name_info, indent=2)
+        # print json.dumps(self.__root_name_info, indent=2)
         # print self.__macro_map
 
     def __include_c_headers(self, compiler_config_json, eliminate_gcc_attr=False):
@@ -51,8 +51,10 @@ class JCC_CUtils():
                 if node.name not in union_dict and node.name:
                     union_dict[node.name] = node
         StructVisitor().visit(full_ast)
+        # full_ast.show()
 
         field_info_list = []
+        anonymous_field_info_list = []
         field_path = []
 
         def size_infer():
@@ -74,61 +76,80 @@ class JCC_CUtils():
             asm_str_list = [x for x in p.communicate(input=sizeof_source)[0].split(os.linesep)
                             if "field_size" in x]
 
+            size_dict = {}
             for idx, asm_str in enumerate(asm_str_list):
-                field_info_list[idx]["sizeof"] = int(asm_str.split(" ")[2][1:])
+                sizeof = int(asm_str.split(" ")[2][1:])
+                field_info_list[idx]["sizeof"] = sizeof
+                size_dict[field_info_list[idx]["field_name"]] = sizeof
+            for idx, field_info in enumerate(anonymous_field_info_list):
+                origin_name = field_info["field_name"].split("#")[1].replace("$", ".")
+                anonymous_field_info_list[idx]["sizeof"] = size_dict[origin_name]
             return field_info_list
 
-        def visit_decl(node, curr_depth, union_depth_list):
+        def visit_decl(node, detect_anonymous_type):
             decl_children_num = 0
 
             if isinstance(node, pycparser.c_ast.Decl) and node.name:
                 field_path.append(node.name)
-                curr_depth += 1
 
             for child in node.children():
-                if isinstance(node, pycparser.c_ast.Union):
-                    decl_children_num += visit_decl(child[1], curr_depth,
-                                                    union_depth_list + [curr_depth + 1])
-                else:
-                    decl_children_num += visit_decl(child[1], curr_depth, union_depth_list)
+                if isinstance(node, pycparser.c_ast.Union) and \
+                   node.name is None and detect_anonymous_type:
+                    anonymous_union_dict["anonymous_union_in#%s" % "$".join(field_path)] = node
+                decl_children_num += visit_decl(child[1], detect_anonymous_type)
 
             if isinstance(node, pycparser.c_ast.Decl) and node.name:
-                type_name = "non_atomic_type_%s" % ".".join(field_path)
-                if decl_children_num == 0:
-                    type_probe = node
-                    while not isinstance(type_probe,
-                                         (pycparser.c_ast.IdentifierType,
-                                          pycparser.c_ast.Struct,
-                                          pycparser.c_ast.Union)):
-                        if len(type_probe.children()) > 0:
-                            type_probe = type_probe.children()[0][1]
-                    if isinstance(type_probe, pycparser.c_ast.IdentifierType):
-                        type_name = " ".join(type_probe.names)
-                    elif isinstance(type_probe, pycparser.c_ast.Struct) and node.name is None:
+                type_probe = node
+                while not isinstance(type_probe,
+                                     (pycparser.c_ast.IdentifierType,
+                                      pycparser.c_ast.Struct,
+                                      pycparser.c_ast.Union)):
+                    if len(type_probe.children()) > 0:
+                        type_probe = type_probe.children()[0][1]
+                if isinstance(type_probe, pycparser.c_ast.IdentifierType):
+                    type_name = " ".join(type_probe.names)
+                elif isinstance(type_probe, pycparser.c_ast.Struct) and type_probe.name is None:
+                    # anonymous struct. maybe anonymous type in anonymous type
+                    type_name = "$".join(field_path)
+                    if "anonymous_struct#" not in type_name:
+                        type_name = "anonymous_struct#" + type_name
+                    if detect_anonymous_type:
                         anonymous_struct_dict[type_name] = type_probe
-                    elif isinstance(type_probe, pycparser.c_ast.Union) and node.name is None:
-                        anonymous_union_dict[type_name] = type_probe
-                    else:
-                        type_name = type_probe.name
-                field_info_list.append({
+                else:
+                    type_name = type_probe.name
+                append_load = {
                     "type_info": type_name,
                     "field_name": ".".join(field_path),
-                    "union_depth_list": union_depth_list
-                })
+                }
+                if detect_anonymous_type:
+                    field_info_list.append(append_load)
+                else:
+                    anonymous_field_info_list.append(append_load)
                 field_path.pop()
                 return decl_children_num + 1
             return decl_children_num
 
+        # expand fields
         for struct_name in struct_dict:
             field_path = [struct_name]
-            visit_decl(struct_dict[struct_name], 0, [])
+            visit_decl(struct_dict[struct_name], True)
         for union_name in union_dict:
             field_path = [union_name]
-            visit_decl(union_dict[union_name], 0, [0])
+            visit_decl(union_dict[union_name], True)
+        # expand anonymous fields
+        for anonymous_struct_name in anonymous_struct_dict:
+            field_path = [anonymous_struct_name]
+            visit_decl(anonymous_struct_dict[anonymous_struct_name], False)
+        for anonymous_union_name in anonymous_union_dict:
+            field_path = [anonymous_union_name]
+            visit_decl(anonymous_union_dict[anonymous_union_name], False)
         size_infer()
 
-        ret_dict = {"struct": {}, "union": {}}
+        ret_dict = {"struct": {}, "union": {}, "anonymous_struct": {}, "anonymous_union": {}}
         for field in field_info_list:
+            # get rid of redundant field information
+            if len(field["field_name"].split(".")) > 2:
+                continue
             root_name = field["field_name"].split(".")[0]
             if root_name in struct_dict:
                 if root_name not in ret_dict["struct"]:
@@ -138,6 +159,18 @@ class JCC_CUtils():
                 if root_name not in ret_dict["union"]:
                     ret_dict["union"][root_name] = []
                 ret_dict["union"][root_name].append(field)
+        for field in anonymous_field_info_list:
+            if len(field["field_name"].split(".")) > 2:
+                continue
+            root_name = field["field_name"].split(".")[0]
+            if root_name in anonymous_struct_dict:
+                if root_name not in ret_dict["anonymous_struct"]:
+                    ret_dict["anonymous_struct"][root_name] = []
+                ret_dict["anonymous_struct"][root_name].append(field)
+            elif root_name in anonymous_union_dict:
+                if root_name not in ret_dict["anonymous_union"]:
+                    ret_dict["anonymous_union"][root_name] = []
+                ret_dict["anonymous_union"][root_name].append(field)
         return ret_dict
 
 
