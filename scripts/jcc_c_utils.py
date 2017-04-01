@@ -34,6 +34,9 @@ class JCC_CUtils():
     def __get_struct_field_info(self, compiler_config_json):
         struct_dict = {}
         union_dict = {}
+        anonymous_struct_dict = {}
+        anonymous_union_dict = {}
+
         tmp_file_path = "%s/tmp.c" % compiler_config_json["tmp_file_dir"]
 
         with open(tmp_file_path, "w") as tmp_file:
@@ -77,7 +80,6 @@ class JCC_CUtils():
 
         def visit_decl(node, curr_depth, union_depth_list):
             decl_children_num = 0
-            type_name = "non_atomic_type"
 
             if isinstance(node, pycparser.c_ast.Decl) and node.name:
                 field_path.append(node.name)
@@ -91,6 +93,7 @@ class JCC_CUtils():
                     decl_children_num += visit_decl(child[1], curr_depth, union_depth_list)
 
             if isinstance(node, pycparser.c_ast.Decl) and node.name:
+                type_name = "non_atomic_type_%s" % ".".join(field_path)
                 if decl_children_num == 0:
                     type_probe = node
                     while not isinstance(type_probe,
@@ -99,14 +102,14 @@ class JCC_CUtils():
                                           pycparser.c_ast.Union)):
                         if len(type_probe.children()) > 0:
                             type_probe = type_probe.children()[0][1]
-                        else:
-                            type_name = "unknown_type"
-                            break
-                    if type_name != "unknown_type":
-                        if isinstance(type_probe, pycparser.c_ast.IdentifierType):
-                            type_name = " ".join(type_probe.names)
-                        else:
-                            type_name = type_probe.name
+                    if isinstance(type_probe, pycparser.c_ast.IdentifierType):
+                        type_name = " ".join(type_probe.names)
+                    elif isinstance(type_probe, pycparser.c_ast.Struct) and node.name is None:
+                        anonymous_struct_dict[type_name] = type_probe
+                    elif isinstance(type_probe, pycparser.c_ast.Union) and node.name is None:
+                        anonymous_union_dict[type_name] = type_probe
+                    else:
+                        type_name = type_probe.name
                 field_info_list.append({
                     "type_info": type_name,
                     "field_name": ".".join(field_path),
@@ -128,13 +131,13 @@ class JCC_CUtils():
         for field in field_info_list:
             root_name = field["field_name"].split(".")[0]
             if root_name in struct_dict:
-                if root_name not in ret_dict["union"]:
-                    ret_dict["union"][root_name] = []
-                ret_dict["union"][root_name].append(field)
-            elif root_name in union_dict:
                 if root_name not in ret_dict["struct"]:
                     ret_dict["struct"][root_name] = []
                 ret_dict["struct"][root_name].append(field)
+            elif root_name in union_dict:
+                if root_name not in ret_dict["union"]:
+                    ret_dict["union"][root_name] = []
+                ret_dict["union"][root_name].append(field)
         return ret_dict
 
 
