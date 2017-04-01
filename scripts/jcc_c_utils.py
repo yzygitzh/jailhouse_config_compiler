@@ -145,32 +145,21 @@ class JCC_CUtils():
             visit_decl(anonymous_union_dict[anonymous_union_name], False)
         size_infer()
 
-        ret_dict = {"struct": {}, "union": {}, "anonymous_struct": {}, "anonymous_union": {}}
+        field_info_list += anonymous_field_info_list
+        ret_dict = {"struct": {}, "union": {}}
         for field in field_info_list:
             # get rid of redundant field information
             if len(field["field_name"].split(".")) > 2:
                 continue
             root_name = field["field_name"].split(".")[0]
-            if root_name in struct_dict:
+            if root_name in struct_dict or root_name in anonymous_struct_dict:
                 if root_name not in ret_dict["struct"]:
                     ret_dict["struct"][root_name] = []
                 ret_dict["struct"][root_name].append(field)
-            elif root_name in union_dict:
+            elif root_name in union_dict or root_name in anonymous_union_dict:
                 if root_name not in ret_dict["union"]:
                     ret_dict["union"][root_name] = []
                 ret_dict["union"][root_name].append(field)
-        for field in anonymous_field_info_list:
-            if len(field["field_name"].split(".")) > 2:
-                continue
-            root_name = field["field_name"].split(".")[0]
-            if root_name in anonymous_struct_dict:
-                if root_name not in ret_dict["anonymous_struct"]:
-                    ret_dict["anonymous_struct"][root_name] = []
-                ret_dict["anonymous_struct"][root_name].append(field)
-            elif root_name in anonymous_union_dict:
-                if root_name not in ret_dict["anonymous_union"]:
-                    ret_dict["anonymous_union"][root_name] = []
-                ret_dict["anonymous_union"][root_name].append(field)
         return ret_dict
 
 
