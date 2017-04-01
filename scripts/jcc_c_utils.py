@@ -13,7 +13,7 @@ class JCC_CUtils():
     def __init__(self, compiler_config_json):
         self.__root_name_info = self.__get_struct_field_info(compiler_config_json)
         self.__macro_map = self.__get_macro_map(compiler_config_json)
-        # print json.dumps(self.__root_name_info, indent=2)
+        print json.dumps(self.__root_name_info, indent=2)
         # print self.__macro_map
 
     def __include_c_headers(self, compiler_config_json, eliminate_gcc_attr=False):
@@ -75,18 +75,20 @@ class JCC_CUtils():
                 field_info_list[idx]["sizeof"] = int(asm_str.split(" ")[2][1:])
             return field_info_list
 
-        def visit_decl(node, in_union):
+        def visit_decl(node, curr_depth, union_depth_list):
             decl_children_num = 0
             type_name = "non_atomic_type"
 
             if isinstance(node, pycparser.c_ast.Decl) and node.name:
                 field_path.append(node.name)
+                curr_depth += 1
 
             for child in node.children():
                 if isinstance(node, pycparser.c_ast.Union):
-                    decl_children_num += visit_decl(child[1], True)
+                    decl_children_num += visit_decl(child[1], curr_depth,
+                                                    union_depth_list + [curr_depth + 1])
                 else:
-                    decl_children_num += visit_decl(child[1], in_union)
+                    decl_children_num += visit_decl(child[1], curr_depth, union_depth_list)
 
             if isinstance(node, pycparser.c_ast.Decl) and node.name:
                 if decl_children_num == 0:
@@ -108,7 +110,7 @@ class JCC_CUtils():
                 field_info_list.append({
                     "type_info": type_name,
                     "field_name": ".".join(field_path),
-                    "in_union": in_union
+                    "union_depth_list": union_depth_list
                 })
                 field_path.pop()
                 return decl_children_num + 1
@@ -116,10 +118,10 @@ class JCC_CUtils():
 
         for struct_name in struct_dict:
             field_path = [struct_name]
-            visit_decl(struct_dict[struct_name], False)
+            visit_decl(struct_dict[struct_name], 0, [])
         for union_name in union_dict:
             field_path = [union_name]
-            visit_decl(union_dict[union_name], True)
+            visit_decl(union_dict[union_name], 0, [0])
         size_infer()
 
         ret_dict = {"struct": {}, "union": {}}
