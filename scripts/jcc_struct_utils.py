@@ -46,9 +46,8 @@ class JCC_StructUtils():
         struct_info = self.__c_util.get_struct_info(struct_name)
         yaml_fields = {}
 
-        for field in yaml_struct:
-            field_key = next(iter(field.items()))[0]
-            field_val = next(iter(field.items()))[1]
+        for field_key in yaml_struct:
+            field_val = yaml_struct[field_key]
             if self.__c_util.is_a_struct(field_key) or \
                self.__c_util.is_a_union(field_key):
                 ret_bytes += self.pack_struct(field_key, field_val, pre_defined_vals)

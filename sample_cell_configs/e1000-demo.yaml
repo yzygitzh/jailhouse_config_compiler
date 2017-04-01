@@ -1,58 +1,49 @@
 jailhouse_cell_desc:
-  - signature: JAILHOUSE_CELL_DESC_SIGNATURE
-  - revision: JAILHOUSE_CONFIG_REVISION
-  - name: e1000-demo
-  - flags: JAILHOUSE_CELL_PASSIVE_COMMREG
+  signature: JAILHOUSE_CELL_DESC_SIGNATURE
+  revision: JAILHOUSE_CONFIG_REVISION
+  name: e1000-demo
+  flags: JAILHOUSE_CELL_PASSIVE_COMMREG
 
-cpus:
-  - 0x4
+cpus: [0x4]
 
 memory_regions:
-  -
-    - phys_start: 0x3ef00000
-    - virt_start: 0
-    - size: 0x00100000
-    - flags: [JAILHOUSE_MEM_READ, JAILHOUSE_MEM_WRITE, JAILHOUSE_MEM_EXECUTE, JAILHOUSE_MEM_DMA, JAILHOUSE_MEM_LOADABLE]
-  -
-    - virt_start: 0x00100000
-    - size: 0x00001000
-    - flags: [JAILHOUSE_MEM_READ, JAILHOUSE_MEM_WRITE, JAILHOUSE_MEM_COMM_REGION]
-  -
-    - phys_start: 0xfebc0000
-    - virt_start: 0xfebc0000
-    - size: 0x00020000
-    - flags: [JAILHOUSE_MEM_READ, JAILHOUSE_MEM_WRITE]
+  - phys_start: 0x3ef00000
+    virt_start: 0
+    size: 0x00100000
+    flags: [JAILHOUSE_MEM_READ, JAILHOUSE_MEM_WRITE, JAILHOUSE_MEM_EXECUTE, JAILHOUSE_MEM_DMA, JAILHOUSE_MEM_LOADABLE]
+  - virt_start: 0x00100000
+    size: 0x00001000
+    flags: [JAILHOUSE_MEM_READ, JAILHOUSE_MEM_WRITE, JAILHOUSE_MEM_COMM_REGION]
+  - phys_start: 0xfebc0000
+    virt_start: 0xfebc0000
+    size: 0x00020000
+    flags: [JAILHOUSE_MEM_READ, JAILHOUSE_MEM_WRITE]
 
 pio_bitmap:
   size: 0x2000
   default_value: 0xff
   holes:
-    -
-      begin: 95
+    - begin: 95
       end: 95
       value: 0
-    -
-      begin: 6144
+    - begin: 6144
       end: 6151
       value: 0
-    -
-      begin: 7168
+    - begin: 7168
       end: 7168
       value: 0
 
 pci_devices:
-  -
-    - type: JAILHOUSE_PCI_TYPE_DEVICE
-    - domain: 0
-    - bdf: 0x00c8
-    - caps_start: 0
-    - num_caps: 1
-    - num_msi_vectors: 1
-    - msi_64bits: 1
+  - type: JAILHOUSE_PCI_TYPE_DEVICE
+    domain: 0
+    bdf: 0x00c8
+    caps_start: 0
+    num_caps: 1
+    num_msi_vectors: 1
+    msi_64bits: 1
 
 pci_caps:
-  -
-    - id: 0x5
-    - start: 0xd0
-    - len: 14
-    - flags: JAILHOUSE_PCICAPS_WRITE
+  - id: 0x5
+    start: 0xd0
+    len: 14
+    flags: JAILHOUSE_PCICAPS_WRITE

@@ -1,38 +1,32 @@
 jailhouse_cell_desc:
-  - signature: JAILHOUSE_CELL_DESC_SIGNATURE
-  - revision: JAILHOUSE_CONFIG_REVISION
-  - name: apic-demo
+  signature: JAILHOUSE_CELL_DESC_SIGNATURE
+  revision: JAILHOUSE_CONFIG_REVISION
+  name: apic-demo
 
-cpus:
-  - 0x8
+cpus: [0x8]
 
 memory_regions:
-  -
-    - phys_start: 0x3f000000
-    - virt_start: 0
-    - size: 0x00100000
-    - flags: [JAILHOUSE_MEM_READ, JAILHOUSE_MEM_WRITE, JAILHOUSE_MEM_EXECUTE, JAILHOUSE_MEM_LOADABLE]
-  -
-    - phys_start: 0
-    - virt_start: 0x00100000
-    - size: 0x00001000
-    - flags: [JAILHOUSE_MEM_READ, JAILHOUSE_MEM_WRITE, JAILHOUSE_MEM_COMM_REGION]
+  - phys_start: 0x3f000000
+    virt_start: 0
+    size: 0x00100000
+    flags: [JAILHOUSE_MEM_READ, JAILHOUSE_MEM_WRITE, JAILHOUSE_MEM_EXECUTE, JAILHOUSE_MEM_LOADABLE]
+  - phys_start: 0
+    virt_start: 0x00100000
+    size: 0x00001000
+    flags: [JAILHOUSE_MEM_READ, JAILHOUSE_MEM_WRITE, JAILHOUSE_MEM_COMM_REGION]
 
 cache_regions:
-  -
-    - start: 0
-    - size: 2
-    - type: JAILHOUSE_CACHE_L3
+  - start: 0
+    size: 2
+    type: JAILHOUSE_CACHE_L3
 
 pio_bitmap:
   size: 0x2000
   default_value: 0xff
   holes:
-    -
-      begin: 127
+    - begin: 127
       end: 127
       value: 0
-    -
-      begin: 7170
+    - begin: 7170
       end: 7170
       value: 0
