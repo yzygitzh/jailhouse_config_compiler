@@ -52,10 +52,16 @@ class JCC_StructUtils():
         if isinstance(field_val, list):
             # array of struct
             if self.__c_util.is_a_struct(type_info):
-                return "".join([self.pack_struct(type_info, field_val) for x in field_val])
+                struct_bytes = "".join([self.pack_struct(type_info, x) for x in field_val])
+                rest_len = sizeof - len(struct_bytes)
+                struct_bytes += struct.pack("=" + "B" * rest_len, *([0] * rest_len))
+                return struct_bytes
             # array of union
-            if self.__c_util.is_a_union(type_info):
-                return "".join([self.pack_struct(type_info, field_val, is_union=True) for x in field_val])
+            elif self.__c_util.is_a_union(type_info):
+                union_bytes = "".join([self.pack_struct(type_info, field_val, is_union=True) for x in field_val])
+                rest_len = sizeof - len(union_bytes)
+                union_bytes += struct.pack("=" + "B" * rest_len, *([0] * rest_len))
+                return union_bytes
             # array of basic type
             else:
                 # macro substitution
@@ -98,15 +104,11 @@ class JCC_StructUtils():
                 ret_bytes += struct.pack("=%s" % size_tag, self.__pre_defined_vals[field["field_name"]])
             elif field_key in yaml_struct: # may be union
                 ret_bytes += self.__extract_field_val(field, yaml_struct[field_key])
-            else: # field not found
-                # see if this an anonymous union for the struct name
-                # and the field_key is one of them
+            elif field_key == field["field_name"]: # anonymous union
                 anonymous_union_name = "anonymous_union_in#" + struct_name.split("#")[-1].replace(".", "$")
-                anonymous_union_bytes = self.__union_bytes(anonymous_union_name, yaml_struct)
-                if anonymous_union_bytes is not None:
-                    ret_bytes += anonymous_union_bytes
-                else: # field really not found; fill sizeof "0" bytes
-                    ret_bytes += struct.pack("=" + "B" * field["sizeof"], *([0] * field["sizeof"]))
+                ret_bytes += self.__union_bytes(anonymous_union_name, yaml_struct)
+            else: # field not found; fill sizeof "0" bytes
+                ret_bytes += struct.pack("=" + "B" * field["sizeof"], *([0] * field["sizeof"]))
 
         return ret_bytes
 
