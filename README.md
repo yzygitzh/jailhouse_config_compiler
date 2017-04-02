@@ -10,4 +10,4 @@ When "meta_type": "jailhouse_cell_desc" in compiler_config.json:
 
 When "meta_type": "jailhouse_system" in compiler_config.json:
 
-    python scripts/jcc_main.py -y sample_cell_configs/hikey.yaml -c compiler_config/compiler_config.json > /tmp/test.txt
+    python scripts/jcc_main.py -y sample_cell_configs/hikey.yaml -c compiler_config/compiler_config.json
