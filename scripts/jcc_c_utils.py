@@ -12,6 +12,7 @@ import pycparser
 class JCC_CUtils():
     def __init__(self, compiler_config_json):
         self.__root_name_info = self.__get_struct_field_info(compiler_config_json)
+        self.__link_anonymous_unions()
         self.__macro_map = self.__get_macro_map(compiler_config_json)
         # print json.dumps(self.__root_name_info, indent=2)
         # print self.__macro_map
@@ -82,9 +83,8 @@ class JCC_CUtils():
                 field_info_list[idx]["sizeof"] = sizeof
                 size_dict[field_info_list[idx]["field_name"]] = sizeof
             for idx, field_info in enumerate(anonymous_field_info_list):
-                origin_name = field_info["field_name"].split("#")[1].replace("$", ".")
+                origin_name = field_info["field_name"].split("#")[-1].replace("$", ".")
                 anonymous_field_info_list[idx]["sizeof"] = size_dict[origin_name]
-            return field_info_list
 
         def visit_decl(node, detect_anonymous_type):
             decl_children_num = 0
@@ -95,6 +95,7 @@ class JCC_CUtils():
             for child in node.children():
                 if isinstance(node, pycparser.c_ast.Union) and \
                    node.name is None and detect_anonymous_type:
+                    # TODO: support single layer union for now
                     anonymous_union_dict["anonymous_union_in#%s" % "$".join(field_path)] = node
                 decl_children_num += visit_decl(child[1], detect_anonymous_type)
 
@@ -111,7 +112,7 @@ class JCC_CUtils():
                 elif isinstance(type_probe, pycparser.c_ast.Struct) and type_probe.name is None:
                     # anonymous struct. maybe anonymous type in anonymous type
                     type_name = "$".join(field_path)
-                    if "anonymous_struct#" not in type_name:
+                    if "anonymous_" not in type_name:
                         type_name = "anonymous_struct#" + type_name
                     if detect_anonymous_type:
                         anonymous_struct_dict[type_name] = type_probe
@@ -161,6 +162,36 @@ class JCC_CUtils():
                     ret_dict["union"][root_name] = []
                 ret_dict["union"][root_name].append(field)
         return ret_dict
+
+    def __link_anonymous_unions(self):
+        # search (anonymous) struct for anonymous unions
+        for struct_name in self.__root_name_info["struct"]:
+            struct_field_list = self.__root_name_info["struct"][struct_name]
+            if "#" in struct_name:
+                anonymous_union_name = "anonymous_union_in#%s" % struct_name.split("#")[-1]
+            else:
+                anonymous_union_name = "anonymous_union_in#%s" % struct_name
+            if anonymous_union_name in self.__root_name_info["union"]:
+                anonymous_union = self.__root_name_info["union"][anonymous_union_name]
+                actual_field_set = set([x["field_name"].split("#")[-1].replace("$", ".")
+                                        for x in anonymous_union])
+                union_start_idx = 0
+                for idx, field in enumerate(struct_field_list):
+                    if field["field_name"].split("#")[-1].replace("$", ".") in actual_field_set:
+                        if union_start_idx == 0:
+                            union_start_idx = idx
+                            union_end_idx = union_start_idx
+                        else:
+                            union_end_idx += 1
+                self.__root_name_info["struct"][struct_name] = struct_field_list[:union_start_idx] + \
+                                    [{
+                                        "field_name": anonymous_union_name,
+                                        "type_info": anonymous_union_name,
+                                        "sizeof": max([x["sizeof"] for x in anonymous_union])
+                                    }] + \
+                                    struct_field_list[union_end_idx + 1:]
+
+
 
 
     def __get_macro_map(self, compiler_config_json):
@@ -215,18 +246,13 @@ class JCC_CUtils():
         return self.__macro_map[macro_id]
 
     def get_struct_info(self, struct_name):
-        if struct_name in self.__root_name_info["struct"]:
-            return self.__root_name_info["struct"][struct_name]
-        else:
-            return self.__root_name_info["union"][struct_name]
+        return self.__root_name_info["struct"][struct_name]
+
+    def get_union_info(self, union_name):
+        return self.__root_name_info["union"][union_name]
 
     def get_struct_size(self, struct_name):
         return sum([x["sizeof"] for x in self.get_struct_info(struct_name)])
 
-    def get_field_info(self, field_name):
-        for root_type in self.__root_name_info:
-            for root_name in self.__root_name_info[root_type]:
-                for field in self.__root_name_info[root_type][root_name]:
-                    if field["field_name"] == field_name:
-                        return field
-
+    def get_union_size(self, union_name):
+        return max([x["sizeof"] for x in self.get_union_info(union_name)])
