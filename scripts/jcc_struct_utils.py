@@ -25,6 +25,25 @@ class JCC_StructUtils():
         else:
             print "Not a basic type: %s/%s" % (c_type, length)
 
+    def __union_bytes(self, union_name, yaml_struct):
+        # return selected key and corresponding yaml_struct
+        if not self.__c_util.is_a_union(union_name):
+            return None
+        else:
+            union_field_dict = {}
+            for field in self.__c_util.get_union_info(union_name):
+                union_field_dict[field["field_name"].split(".")[-1]] = field
+            selected_fields = list(set(yaml_struct.keys()) & set(union_field_dict.keys()))
+            if len(selected_fields) > 1:
+                print "More than 1 union field selected"
+                union_bytes = self.__extract_field_val(selected_fields[0],
+                                                       yaml_struct[selected_fields[0]])
+                union_size = self.__c_util.get_union_size(union_name)
+                rest_len = union_size - len(union_bytes)
+                return union_bytes + struct.pack("=" + "B" * rest_len, *([0] * rest_len))
+            else:
+                return None
+
     def __extract_field_val(self, field_info, field_val): # accept (non)basic type field
         ret_bytes = ""
         type_info = field_info["type_info"]
@@ -68,23 +87,7 @@ class JCC_StructUtils():
         if not is_union:
             struct_info = self.__c_util.get_struct_info(struct_name)
         else:
-            struct_info = self.__c_util.get_union_info(struct_name)
-
-        # TODO: extract union intersect work as a function
-        #       and make use of them in __extract_field_info to support explicit union
-        anonymous_union_name = "anonymous_union_in#" + struct_name.split("#")[-1].replace(".", "$")
-        anonymous_union_exist = self.__c_util.is_a_union(anonymous_union_name)
-        if anonymous_union_exist:
-            union_size = self.__c_util.get_union_size(anonymous_union_name)
-            anonymous_union_field_dict = {}
-            for field in self.__c_util.get_union_info(anonymous_union_name):
-                anonymous_union_field_dict[field["field_name"].split(".")[-1]] = field
-            union_select = list(set(yaml_struct.keys()) & set(anonymous_union_field_dict.keys()))
-            anonymous_union_field = None
-            if len(union_select) > 1:
-                print "More than 1 union field selected"
-            elif len(union_select) == 1:
-                anonymous_union_field = union_select[0]
+            return self.__union_bytes(struct_name, yaml_struct)
 
         for field in struct_info:
             field_key = field["field_name"].split(".")[-1]
@@ -94,15 +97,15 @@ class JCC_StructUtils():
                 ret_bytes += struct.pack("=%s" % size_tag, self.__pre_defined_vals[field["field_name"]])
             elif field_key in yaml_struct: # may be union
                 ret_bytes += self.__extract_field_val(field, yaml_struct[field_key])
-            # see if there is an anonymous union for the struct name
-            # and the field_key is one of them
-            elif anonymous_union_exist and anonymous_union_field is not None:
-                union_bytes = self.__extract_field_val(anonymous_union_field_dict[anonymous_union_field],
-                                                       yaml_struct[anonymous_union_field])
-                rest_len = union_size - len(union_bytes)
-                ret_bytes += union_bytes + struct.pack("=" + "B" * rest_len, *([0] * rest_len))
-            else: # field not found; fill sizeof "0" bytes
-                ret_bytes += struct.pack("=" + "B" * field["sizeof"], *([0] * field["sizeof"]))
+            else: # field not found
+                # see if this an anonymous union for the struct name
+                # and the field_key is one of them
+                anonymous_union_name = "anonymous_union_in#" + struct_name.split("#")[-1].replace(".", "$")
+                anonymous_union_bytes = self.__union_bytes(anonymous_union_name, yaml_struct)
+                if anonymous_union_bytes is not None:
+                    ret_bytes += anonymous_union_bytes
+                else: # field really not found; fill sizeof "0" bytes
+                    ret_bytes += struct.pack("=" + "B" * field["sizeof"], *([0] * field["sizeof"]))
 
         return ret_bytes
 
