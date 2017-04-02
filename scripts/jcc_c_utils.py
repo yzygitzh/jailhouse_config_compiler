@@ -111,9 +111,7 @@ class JCC_CUtils():
                     type_name = " ".join(type_probe.names)
                 elif isinstance(type_probe, pycparser.c_ast.Struct) and type_probe.name is None:
                     # anonymous struct. maybe anonymous type in anonymous type
-                    type_name = "$".join(field_path)
-                    if "anonymous_" not in type_name:
-                        type_name = "anonymous_struct#" + type_name
+                    type_name = "anonymous_struct#" + "$".join(field_path).split("#")[-1].replace(".", "$")
                     if detect_anonymous_type:
                         anonymous_struct_dict[type_name] = type_probe
                 else:
