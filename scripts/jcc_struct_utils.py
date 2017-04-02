@@ -36,7 +36,8 @@ class JCC_StructUtils():
             selected_fields = list(set(yaml_struct.keys()) & set(union_field_dict.keys()))
             if len(selected_fields) > 1:
                 print "More than 1 union field selected"
-                union_bytes = self.__extract_field_val(selected_fields[0],
+            elif len(selected_fields) == 1:
+                union_bytes = self.__extract_field_val(union_field_dict[selected_fields[0]],
                                                        yaml_struct[selected_fields[0]])
                 union_size = self.__c_util.get_union_size(union_name)
                 rest_len = union_size - len(union_bytes)
