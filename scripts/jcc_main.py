@@ -14,17 +14,18 @@ import jcc_struct_utils
 
 def gen_cell_bytes(jcc_cutils, config_yaml, compiler_config_json):
     meta_type = compiler_config_json["meta_type"]
+    cell_type = compiler_config_json["cell_type"]
     pre_defined_vals = {}
     jcc_sutils = jcc_struct_utils.JCC_StructUtils(jcc_cutils)
 
-    def gen_region_bytes(region_name, pre_defined_val_name):
+    def gen_region_bytes(region_name, region_len_val):
         if region_name in config_yaml:
             regions = config_yaml[region_name]
-            pre_defined_vals["%s.%s" % (meta_type, pre_defined_val_name)] = len(regions)
+            jcc_sutils.add_pre_defined_vals("%s.%s" % (cell_type, region_len_val), len(regions))
             ret_bytes = ""
             for region in regions:
                 ret_bytes += jcc_sutils.pack_struct(compiler_config_json["reserved_field_types"][region_name],
-                                                    region, [])
+                                                    region)
             return ret_bytes
         else:
             return ""
@@ -33,7 +34,7 @@ def gen_cell_bytes(jcc_cutils, config_yaml, compiler_config_json):
     cpu_bytes = ""
     if "cpus" in config_yaml:
         cpus = config_yaml["cpus"]
-        pre_defined_vals["%s.%s" % (meta_type, "cpu_set_size")] = len(cpus) * 8
+        jcc_sutils.add_pre_defined_vals("%s.%s" % (cell_type, "cpu_set_size"), len(cpus) * 8)
         cpu_bytes = struct.pack("Q" * len(cpus), *cpus)
 
     # memory_regions
@@ -47,7 +48,7 @@ def gen_cell_bytes(jcc_cutils, config_yaml, compiler_config_json):
     pio_bitmap_bytes = ""
     if "pio_bitmap" in config_yaml:
         pio_bitmap = config_yaml["pio_bitmap"]
-        pre_defined_vals["%s.%s" % (meta_type, "pio_bitmap_size")] = pio_bitmap["size"]
+        jcc_sutils.add_pre_defined_vals("%s.%s" % (cell_type, "pio_bitmap_size"), pio_bitmap["size"])
         bitmap_bytes = bytearray(struct.pack("B", pio_bitmap["default_value"]) * pio_bitmap["size"])
         for hole in pio_bitmap["holes"]:
             for idx in range(hole["begin"], hole["end"] + 1):
@@ -60,9 +61,7 @@ def gen_cell_bytes(jcc_cutils, config_yaml, compiler_config_json):
     pci_caps_bytes = gen_region_bytes("pci_caps", "num_pci_caps")
 
     # fill back meta_type
-    meta_bytes = jcc_sutils.pack_struct(meta_type,
-                                        config_yaml[meta_type],
-                                        pre_defined_vals)
+    meta_bytes = jcc_sutils.pack_struct(meta_type, config_yaml[meta_type])
     return meta_bytes + cpu_bytes + memory_bytes + cache_bytes + irqchip_bytes + \
            pio_bitmap_bytes + pci_device_bytes + pci_caps_bytes
 
@@ -80,7 +79,7 @@ def run(compiler_config_json_path, cell_config_yaml_path):
         cell_config_yaml = yaml.load(cell_config_yaml_file)
         # print cell_config_yaml
         cell_bytes = gen_cell_bytes(jcc_cutils, cell_config_yaml, compiler_config_json)
-        # print len(cell_bytes)
+        print len(cell_bytes)
         with open(compiler_config_json["output_path"], "wb") as output_file:
             output_file.write(cell_bytes)
 

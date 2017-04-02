@@ -13,5 +13,6 @@
     },
     "output_path": "/tmp/testcell",
     "tmp_file_dir": "/tmp/tmpfile",
-    "meta_type": "jailhouse_cell_desc"
+    "cell_type": "jailhouse_cell_desc",
+    "meta_type": "jailhouse_system"
 }
