@@ -35,7 +35,7 @@ class JCC_StructUtils():
                 return "".join([self.pack_struct(type_info, field_val) for x in field_val])
             # array of union
             if self.__c_util.is_a_union(type_info):
-                return "".join([self.pack_struct(type_info, field_val) for x in field_val])
+                return "".join([self.pack_struct(type_info, field_val, is_union=True) for x in field_val])
             # array of basic type
             else:
                 # macro substitution
@@ -48,8 +48,11 @@ class JCC_StructUtils():
                 else: # array initialization
                     return struct.pack("=%s" % size_tag,
                                        *(ret_array + [0] * (array_length - len(ret_array))))
-        elif isinstance(field_val, dict): # single struct
-            return self.pack_struct(type_info, field_val)
+        elif isinstance(field_val, dict): # single struct/union
+            if self.__c_util.is_a_struct(type_info):
+                return self.pack_struct(type_info, field_val)
+            elif self.__c_util.is_a_union(type_info):
+                return self.pack_struct(type_info, field_val, is_union=True)
         else:
             # single basic type
             size_tag, array_length = self.__infer_size_tag(type_info, sizeof)
@@ -60,19 +63,44 @@ class JCC_StructUtils():
             else: # array initialization (without [] in YAML)
                 return struct.pack("=%s" % size_tag, *([field_val] + [0] * (array_length - 1)))
 
-    def pack_struct(self, struct_name, yaml_struct):
+    def pack_struct(self, struct_name, yaml_struct, is_union=False):
         ret_bytes = ""
-        struct_info = self.__c_util.get_struct_info(struct_name)
+        if not is_union:
+            struct_info = self.__c_util.get_struct_info(struct_name)
+        else:
+            struct_info = self.__c_util.get_union_info(struct_name)
+
+        # TODO: extract union intersect work as a function
+        #       and make use of them in __extract_field_info to support explicit union
+        anonymous_union_name = "anonymous_union_in#" + struct_name.split("#")[-1].replace(".", "$")
+        anonymous_union_exist = self.__c_util.is_a_union(anonymous_union_name)
+        if anonymous_union_exist:
+            union_size = self.__c_util.get_union_size(anonymous_union_name)
+            anonymous_union_field_dict = {}
+            for field in self.__c_util.get_union_info(anonymous_union_name):
+                anonymous_union_field_dict[field["field_name"].split(".")[-1]] = field
+            union_select = list(set(yaml_struct.keys()) & set(anonymous_union_field_dict.keys()))
+            anonymous_union_field = None
+            if len(union_select) > 1:
+                print "More than 1 union field selected"
+            elif len(union_select) == 1:
+                anonymous_union_field = union_select[0]
 
         for field in struct_info:
-            print field["field_name"]
             field_key = field["field_name"].split(".")[-1]
             # expand pre_defined vals; TODO: now basic non-array type only
             if field["field_name"] in self.__pre_defined_vals:
                 size_tag, _ = self.__infer_size_tag(field["type_info"], field["sizeof"])
                 ret_bytes += struct.pack("=%s" % size_tag, self.__pre_defined_vals[field["field_name"]])
-            elif field_key in yaml_struct:
+            elif field_key in yaml_struct: # may be union
                 ret_bytes += self.__extract_field_val(field, yaml_struct[field_key])
+            # see if there is an anonymous union for the struct name
+            # and the field_key is one of them
+            elif anonymous_union_exist and anonymous_union_field is not None:
+                union_bytes = self.__extract_field_val(anonymous_union_field_dict[anonymous_union_field],
+                                                       yaml_struct[anonymous_union_field])
+                rest_len = union_size - len(union_bytes)
+                ret_bytes += union_bytes + struct.pack("=" + "B" * rest_len, *([0] * rest_len))
             else: # field not found; fill sizeof "0" bytes
                 ret_bytes += struct.pack("=" + "B" * field["sizeof"], *([0] * field["sizeof"]))
 
